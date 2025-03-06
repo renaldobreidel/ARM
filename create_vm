@@ -1,0 +1,176 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "westeurope"
+        },
+        "vnetResourceGroup": {
+            "type": "string",
+            "defaultValue": "org-corp-rg-network"
+        },
+        "vnetName": {
+            "type": "string",
+            "defaultValue": "org-corp-vn-prod"
+        },
+        "vnetAddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.1.2.3/21"
+        },
+        "subnetName": {
+            "type": "string",
+            "defaultValue": "org-corp-sn-prod-servers"
+        },
+        "Subnet1Prefix": {
+            "type": "string",
+            "defaultValue": "10.1.2.3/24"
+        },
+        "ServerPrivateIP": {
+            "type": "string",
+            "defaultValue": "10.1.2.3",
+            "metadata": {
+                "description": "Private IP address for domain controller 1"
+            }
+        },
+        "virtualMachineName": {
+            "type": "string"
+        },
+        "VMResourceGroup": {
+            "type": "string",
+            "defaultValue": "org-corp-rg-servers-prod"
+        },
+        "virtualMachineSize": {
+            "type": "string"
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "adminPassword": {
+            "type": "secureString"
+        },
+        "secureBoot": {
+            "type": "bool",
+            "defaultValue": true
+        },
+        "vTPM": {
+            "type": "bool",
+            "defaultValue": true
+        }
+    },
+    "variables": {
+        "vnetId": "[resourceId(parameters('vnetResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+        "subnetRef": "[concat(variables('vnetId'), '/subnets/', parameters('subnetName'))]",
+        "Server_network_NIC_Name": "[concat(parameters('virtualMachineName'),'-nic')]",
+        "Server_network_NIC_Id": "[resourceId('Microsoft.Network/networkInterfaces',variables('Server_network_NIC_Name'))]"
+    },
+    "resources": [
+        {
+            "name": "[variables('Server_network_NIC_Name')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2022-11-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('ServerPrivateIP')]",
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            }
+                        }
+                    }
+                ]
+            },
+            "tags": {
+                "application": "UNKNOWN",
+                "environment": "production",
+                "managed by": "COMPANY",
+                "owner": "COMPANY",
+                "server role": "UNKNOWN",
+                "subscription": "corp",
+                "backup app": "veeam backup",
+                "backup policy": "corp bronze"
+            }
+        },
+        {
+            "name": "[parameters('virtualMachineName')]",
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2022-11-01",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[variables('Server_network_NIC_Id')]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('virtualMachineSize')]"
+                },
+                "securityProfile": {
+                    "secureBootEnabled": "[parameters('secureBoot')]",
+                    "vTpmEnabled": "[parameters('vTPM')]"
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "name": "[concat(parameters('virtualMachineName'),'_osdisk')]",
+                        "createOption": "FromImage",
+                        "managedDisk": {
+                            "storageAccountType": "Premium_LRS"
+                        }
+                    },
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2022-datacenter-azure-edition",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[variables('Server_network_NIC_Id')]",
+                            "properties": {
+                                "primary": true
+                            }
+                        }
+                    ]
+                },
+                "additionalCapabilities": {
+                    "hibernationEnabled": false
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachineName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]",
+                    "windowsConfiguration": {
+                        "enableAutomaticUpdates": true,
+                        "provisionVmAgent": true
+                    }
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            },
+            "tags": {
+                "application": "UNKNOWN",
+                "environment": "production",
+                "managed by": "COMPANY",
+                "owner": "COMPANY",
+                "server role": "UNKNOWN",
+                "subscription": "corp",
+                "backup app": "veeam backup",
+                "backup policy": "corp bronze"
+            }
+        }
+    ],
+    "outputs": {
+        "adminUsername": {
+            "type": "string",
+            "value": "[parameters('adminUsername')]"
+        }
+    }
+}
